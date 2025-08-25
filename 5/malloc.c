@@ -11,14 +11,14 @@ typedef struct MyPageHeader{
     size_t size;
     size_t free_mem;
     struct MyPageHeader* next;
-    // struct MyPageHeader* prev;
+    struct MyPageHeader* prev;
 }MyPageHeader;
 
 typedef struct MyBlockHeader{
     size_t size;
     bool is_free;
     struct MyBlockHeader* next;
-    // struct MyBlockHeader* prev;
+    struct MyBlockHeader* prev;
 }MyBlockHeader;
 
 static MyPageHeader* first_page = NULL;
@@ -33,7 +33,7 @@ MyBlockHeader* find_free_block(size_t size){
         //cycle to available block in the page, and make sure we don't go out of page bounds,
         //if block is out of page bounds, stop the loop and go to next page
         while(current_block != NULL && (char*)current_block < (char*)current_page + current_page->size){
-            if(current_block->is_free && current_block->size >= size && current_block != NULL){
+            if(current_block->is_free && current_block->size >= size){
                 return current_block;
             }
                 current_block = current_block->next;
@@ -80,6 +80,22 @@ MyPageHeader* create_new_page(size_t size){
     new_page_header->size = pages_size;
     new_page_header->free_mem = pages_size - needed_size + size;
     new_page_header->next = NULL;
+
+    //linking to existing pages
+    if(first_page == NULL){
+        first_page = new_page_header;
+        new_page_header->prev = NULL;
+        new_page_header->next = NULL; 
+    }
+    else{
+        MyPageHeader* current = first_page;
+        while(current->next != NULL){
+            current = current->next;
+        }
+        current->next = new_page_header;
+        new_page_header->prev = current;
+        new_page_header->next = NULL;
+    }
     
     return new_page_header;
 }
@@ -100,8 +116,8 @@ void* my_malloc(size_t size){
     }
     
     //if no free block found, try to find a page with enough memory
-    MyPageHeader* current_page = first_page;
-    if(current_page != NULL){
+    if(first_page != NULL){
+        MyPageHeader* current_page = first_page;
         while(current_page != NULL){
             if(current_page->free_mem >= size + sizeof(MyBlockHeader)){
                 page = current_page;
