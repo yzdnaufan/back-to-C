@@ -21,7 +21,10 @@ typedef struct MyBlockHeader{
     struct MyBlockHeader* prev;
 }MyBlockHeader;
 
+
 static MyPageHeader* first_page = NULL;
+
+static int debug_counter = 0;
 
 MyBlockHeader* find_free_block(size_t size){
     MyPageHeader* current_page = first_page;
@@ -49,12 +52,26 @@ MyBlockHeader* create_new_block(size_t size, MyPageHeader* page){
         return NULL;
    }
 
-   //cycle trough blocks in the page to find the last block
+//    MyBlockHeader* current_block= NULL;
+//    //cycle trough blocks in the page to find the last block
+//    if(page->free_mem == page->size + sizeof(MyPageHeader)){
+//         MyBlockHeader* current_block = (MyBlockHeader*)((char*)page + sizeof(MyPageHeader));
+//    }
+
     MyBlockHeader* current_block = (MyBlockHeader*)((char*)page + sizeof(MyPageHeader));
+
+    // printf("---->testing log: %d\n", current_block);
     MyBlockHeader* last_block = NULL;
+    
+//    printf("debug counter:%d", debug_counter);
+
     while (current_block != NULL){
+        // printf("----->testing log: %d\n", current_block);
+        // debug_counter++;
+        // printf("debug counter:%d", debug_counter);
+    
         //check boundary
-        if(current_block >= (char*)page + page->size){
+        if(current_block>(char*)page + page->size){
             break;
         }
         last_block = current_block;
@@ -288,46 +305,46 @@ int main() {
     printf("Allocated ptr1: %p\n", ptr1);
     print_memory_usage();
     
-    printf("Allocating 128 bytes...\n");
-    void* ptr2 = my_malloc(128);
-    printf("Allocated ptr2: %p\n", ptr2);
-    print_memory_usage();
+    // printf("Allocating 128 bytes...\n");
+    // void* ptr2 = my_malloc(128);
+    // printf("Allocated ptr2: %p\n", ptr2);
+    // print_memory_usage();
     
-    printf("Allocating 32 bytes...\n");
-    void* ptr3 = my_malloc(32);
-    printf("Allocated ptr3: %p\n", ptr3);
-    print_memory_usage();
+    // printf("Allocating 32 bytes...\n");
+    // void* ptr3 = my_malloc(32);
+    // printf("Allocated ptr3: %p\n", ptr3);
+    // print_memory_usage();
     
-    printf("Freeing ptr2 (128 bytes)...\n");
-    my_free(ptr2);
-    print_memory_usage();
+    // printf("Freeing ptr2 (128 bytes)...\n");
+    // // my_free(ptr2);
+    // print_memory_usage();
     
-    printf("Freeing ptr1 (64 bytes) - should coalesce with ptr2...\n");
-    my_free(ptr1);
-    print_memory_usage();
+    // printf("Freeing ptr1 (64 bytes) - should coalesce with ptr2...\n");
+    // // my_free(ptr1);
+    // print_memory_usage();
     
-    printf("Allocating 100 bytes (should reuse coalesced space)...\n");
-    void* ptr4 = my_malloc(100);
-    printf("Allocated ptr4: %p\n", ptr4);
-    print_memory_usage();
+    // printf("Allocating 100 bytes (should reuse coalesced space)...\n");
+    // void* ptr4 = my_malloc(100);
+    // printf("Allocated ptr4: %p\n", ptr4);
+    // print_memory_usage();
     
-    printf("Allocating large block (5000 bytes - will need new page)...\n");
-    void* ptr5 = my_malloc(5000);
-    printf("Allocated ptr5: %p\n", ptr5);
-    print_memory_usage();
+    // printf("Allocating large block (5000 bytes - will need new page)...\n");
+    // void* ptr5 = my_malloc(5000);
+    // printf("Allocated ptr5: %p\n", ptr5);
+    // print_memory_usage();
     
-    printf("Freeing ptr5 (large block)...\n");
-    // my_free(ptr5);
-    print_memory_usage();
+    // printf("Freeing ptr5 (large block)...\n");
+    // // my_free(ptr5);
+    // print_memory_usage();
     
-    printf("Freeing remaining blocks...\n");
-    // my_free(ptr3);
-    // my_free(ptr4);
-    print_memory_usage();
+    // printf("Freeing remaining blocks...\n");
+    // // my_free(ptr3);
+    // // my_free(ptr4);
+    // print_memory_usage();
     
-    // Test double free detection
-    printf("Testing double free detection...\n");
-    // my_free(ptr1); // Should show warning
+    // // Test double free detection
+    // printf("Testing double free detection...\n");
+    // // my_free(ptr1); // Should show warning
     
     
     return 0;
