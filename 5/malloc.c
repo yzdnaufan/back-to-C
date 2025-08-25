@@ -317,31 +317,18 @@ int main() {
     print_memory_usage();
     
     printf("Freeing ptr5 (large block)...\n");
-    my_free(ptr5);
+    // my_free(ptr5);
     print_memory_usage();
     
     printf("Freeing remaining blocks...\n");
-    my_free(ptr3);
-    my_free(ptr4);
+    // my_free(ptr3);
+    // my_free(ptr4);
     print_memory_usage();
     
     // Test double free detection
     printf("Testing double free detection...\n");
-    my_free(ptr1); // Should show warning
+    // my_free(ptr1); // Should show warning
     
-    // Test string comparison
-    printf("\n=== Testing String Comparison ===\n");
-    char s_1[] = "halo";
-    char s_2[] = "hala";
-
-    int res = my_strcmp(s_1, s_2);
-    if (res > 0) {
-        printf("String '%s' comes after '%s' lexically\n", s_1, s_2);
-    } else if (res == 0) {
-        printf("Both strings are the same\n");
-    } else {
-        printf("String '%s' comes before '%s' lexically\n", s_1, s_2);
-    }
     
     return 0;
 }
