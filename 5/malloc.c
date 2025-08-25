@@ -25,17 +25,8 @@ static MyPageHeader* first_page = NULL;
 
 MyBlockHeader* find_free_block(size_t size){
     MyPageHeader* current_page = first_page;
-        
     //if there is a page, cycle through it then check for first block whether it is free and has enough size
     while(current_page != NULL){
-        // NOTEs: I dunno if this is correct or not aka. redundant maybe?
-        // // Check if there are any blocks in this page
-        // if (current_page->free_mem == current_page->size - sizeof(MyPageHeader)) {
-        //     // No blocks created yet, skip to next page
-        //     current_page = current_page->next;
-        //     continue;
-        // }
-
         //find the first block in the page
         MyBlockHeader* current_block = (MyBlockHeader*)((char*)current_page + sizeof(MyPageHeader));
         
@@ -139,18 +130,10 @@ void* my_malloc(size_t size){
 
 int main() {
     // Write C code here
-    char s_1[]= "halo";
-    char s_2[]= "hala";
 
-    int res = my_strcmp(s_1,s_2);
-    if(res>0){
-        printf("Both string is different, but string A will appear first lexically");
-    }
-    else if (res == 0){
-        printf("Both string is same");
-    }
-    else{
-        printf("Both string is different, but string B will appear first lexically");
-    }
+    //TODO: test the malloc functions
+    printf("Hello world");
+
+
     return 0;
 }
