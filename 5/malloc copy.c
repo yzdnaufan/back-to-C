@@ -1,8 +1,8 @@
-// Online C compiler to run C program online
 #include <stdio.h>
 #include <stdbool.h>
 #include <sys/mman.h> 
 #include <unistd.h> 
+#include <string.h>
 
 #define PAGE_SIZE 4096
 #define BLOCK_SIZE 16
@@ -11,165 +11,287 @@ typedef struct MyPageHeader{
     size_t size;
     size_t free_mem;
     struct MyPageHeader* next;
-    struct MyPageHeader* prev;
 }MyPageHeader;
 
 typedef struct MyBlockHeader{
     size_t size;
     bool is_free;
     struct MyBlockHeader* next;
-    struct MyBlockHeader* prev;
 }MyBlockHeader;
 
 static MyPageHeader* first_page = NULL;
 
-MyBlockHeader* find_free_block(size_t size){
+// Helper function to implement strcmp since it's used in main
+int my_strcmp(const char* str1, const char* str2) {
+    while (*str1 && (*str1 == *str2)) {
+        str1++;
+        str2++;
+    }
+    return *(unsigned char*)str1 - *(unsigned char*)str2;
+}
+
+MyBlockHeader* find_free_block(size_t size) {
     MyPageHeader* current_page = first_page;
-    //if there is a page, cycle through it then check for first block whether it is free and has enough size
-    while(current_page != NULL){
-        //find the first block in the page
+    
+    while (current_page != NULL) {
         MyBlockHeader* current_block = (MyBlockHeader*)((char*)current_page + sizeof(MyPageHeader));
         
-        //cycle to available block in the page, and make sure we don't go out of page bounds,
+        // NOTEs: I dunno if this is correct or not aka. redundant maybe?
+        // // Check if there are any blocks in this page
+        // if (current_page->free_mem == current_page->size - sizeof(MyPageHeader)) {
+        //     // No blocks created yet, skip to next page
+        //     current_page = current_page->next;
+        //     continue;
+        // }
+        
+        //cycle through blocks in the page, and make sure we don't go out of page bounds,
         //if block is out of page bounds, stop the loop and go to next page
-        while(current_block != NULL && (char*)current_block < (char*)current_page + current_page->size){
-            if(current_block->is_free && current_block->size >= size){
+        while (current_block != NULL && 
+               (char*)current_block < (char*)current_page + current_page->size) {
+            if (current_block->is_free && current_block->size >= size) {
                 return current_block;
             }
-                current_block = current_block->next;
-            }
+            current_block = current_block->next;
+        }
         current_page = current_page->next;
     }
     return NULL;
 }
 
-MyBlockHeader* create_new_block(size_t size, MyPageHeader* page){
-   //check if the page have enough free memory for our block
-   if(page->free_mem < size + sizeof(MyBlockHeader)){
+MyBlockHeader* create_new_block(size_t size, MyPageHeader* page) {
+    if (page->free_mem < size + sizeof(MyBlockHeader)) {
         return NULL;
-   }
-
-   //cycle trough blocks in the page to find the last block
+    }
+    
+    // Find the end of existing blocks or start of page if no blocks exist
     MyBlockHeader* current_block = (MyBlockHeader*)((char*)page + sizeof(MyPageHeader));
     MyBlockHeader* last_block = NULL;
-    while (current_block != NULL){
-        //check boundary
-        if(current_block >= (char*)page + page->size){
+    
+    // Find the last block or determine if this is the first block
+    while (current_block != NULL) {
+        //check page boundary
+        if(current_block>= (char*)page + page->size){
             break;
         }
         last_block = current_block;
         current_block = current_block->next;
     }
-
-    //set new block address, if there is block travesed
+    
+    // Calculate position for new block
     char* new_block_pos;
-    if(last_block!=NULL){
+    if (last_block == NULL) {
+        // First block in the page
+        new_block_pos = (char*)page + sizeof(MyPageHeader);
+    } else {
+        // After the last block
         new_block_pos = (char*)last_block + sizeof(MyBlockHeader) + last_block->size;
     }
-    else{
-        new_block_pos = (char*)current_block;
-    }
-
-    //make new block
-    MyBlockHeader* new_block = (MyBlockHeader*) new_block_pos;
-    new_block->is_free = false;
+    
+    MyBlockHeader* new_block = (MyBlockHeader*)new_block_pos;
     new_block->size = size;
+    new_block->is_free = false;  // Mark as allocated
     new_block->next = NULL;
-    new_block->prev = NULL;
-
-    //link to existing block
+    
+    // Link the previous block to this new block
     if (last_block != NULL) {
         last_block->next = new_block;
-        new_block->prev = last_block;
     }
     
     // Update page free memory
     page->free_mem -= (size + sizeof(MyBlockHeader));
-
+    
     return new_block;
-
 }
 
-MyPageHeader* create_new_page(size_t size){
+MyPageHeader* create_new_page(size_t size) {
+    size_t needed_size = sizeof(MyPageHeader) + sizeof(MyBlockHeader) + size;
+    size_t pages_needed = (needed_size + PAGE_SIZE - 1) / PAGE_SIZE;
+    size_t total_size = pages_needed * PAGE_SIZE;
     
-    //calculate how many pages needed
-    size_t needed_size = sizeof(MyPageHeader) + size;
-    size_t pages_needed = (needed_size+PAGE_SIZE-1)/ PAGE_SIZE;
-    size_t pages_size = pages_needed * PAGE_SIZE;
-    
-    //allocate memory using mmap
-    void* new_mem = mmap(NULL, pages_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    void* new_mem = mmap(NULL, total_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (new_mem == MAP_FAILED) {
-        return NULL; // Out of memory
+        return NULL;
     }
     
-    //create and initialize new page header
-    MyPageHeader* new_page_header = (MyPageHeader*) new_mem;
-    new_page_header->size = pages_size;
-    new_page_header->free_mem = pages_size - needed_size + size;
+    MyPageHeader* new_page_header = (MyPageHeader*)new_mem;
+    new_page_header->size = total_size;
+    new_page_header->free_mem = total_size - sizeof(MyPageHeader);
     new_page_header->next = NULL;
-
-    //linking to existing pages
-    if(first_page == NULL){
+    
+    // Link to existing pages
+    if (first_page == NULL) {
         first_page = new_page_header;
-        new_page_header->prev = NULL;
-        new_page_header->next = NULL; 
-    }
-    else{
+    } else {
         MyPageHeader* current = first_page;
-        while(current->next != NULL){
+        while (current->next != NULL) {
             current = current->next;
         }
         current->next = new_page_header;
-        new_page_header->prev = current;
-        new_page_header->next = NULL;
     }
     
     return new_page_header;
 }
 
-void* my_malloc(size_t size){
-    // set minimum block size
-    if(size < BLOCK_SIZE){
-        size = BLOCK_SIZE;
-    }
-
-    MyPageHeader* page = NULL;
-
-    //cycle through available block to find free memory, if found, return the address
-    MyBlockHeader* block_mem = find_free_block(size);
-    if(block_mem != NULL){
-        block_mem->is_free = false;
-        return (void*)((char*)block_mem + sizeof(MyBlockHeader));
+void* my_malloc(size_t size) {
+    if (size == 0) {
+        return NULL;
     }
     
-    //if no free block found, try to find a page with enough memory
-    if(first_page != NULL){
+    // Align size to minimum block size
+    if (size < BLOCK_SIZE) {
+        size = BLOCK_SIZE;
+    }
+    
+    // Try to find a free block first
+    MyBlockHeader* block = find_free_block(size);
+    
+    if (block != NULL) {
+        block->is_free = false;
+        return (void*)((char*)block + sizeof(MyBlockHeader));
+    }
+    
+    // No suitable free block found, need a new page
+    MyPageHeader* page = NULL;
+    
+    // Check if we can use an existing page
+    if (first_page != NULL) {
         MyPageHeader* current_page = first_page;
-        while(current_page != NULL){
-            if(current_page->free_mem >= size + sizeof(MyBlockHeader)){
+        while (current_page != NULL) {
+            if (current_page->free_mem >= size + sizeof(MyBlockHeader)) {
                 page = current_page;
                 break;
             }
             current_page = current_page->next;
         }
     }
-
-    //if no page with enough memory found, create a new page
-    if(page == NULL){
+    
+    // Create new page if needed
+    if (page == NULL) {
         page = create_new_page(size);
-        if(page == NULL){
+        if (page == NULL) {
             return NULL; // Out of memory
         }
     }
-
-    //create a new block in the page
-    block_mem = create_new_block(size, page);
-    if(block_mem == NULL){
+    
+    // Create new block in the page
+    block = create_new_block(size, page);
+    if (block == NULL) {
         return NULL;
     }
+    
+    return (void*)((char*)block + sizeof(MyBlockHeader));
+}
 
-    return (void*)((char*)block_mem+sizeof(MyBlockHeader));
+// Helper function to coalesce adjacent free blocks
+void coalesce_blocks(MyPageHeader* page) {
+    MyBlockHeader* current = (MyBlockHeader*)((char*)page + sizeof(MyPageHeader));
+    
+    while (current != NULL && current->next != NULL) {
+        if (current->is_free && current->next->is_free) {
+            // Merge current block with next block
+            MyBlockHeader* next_block = current->next;
+            current->size += sizeof(MyBlockHeader) + next_block->size;
+            current->next = next_block->next;
+            
+            // Update page free memory (we're removing one block header)
+            page->free_mem += sizeof(MyBlockHeader);
+            
+            // Continue checking from current block (don't advance)
+            continue;
+        }
+        current = current->next;
+    }
+}
+
+// Helper function to check if a page is completely free
+bool is_page_empty(MyPageHeader* page) {
+    MyBlockHeader* current = (MyBlockHeader*)((char*)page + sizeof(MyPageHeader));
+    
+    // If free memory equals total memory minus page header, page is empty
+    if (page->free_mem == page->size - sizeof(MyPageHeader)) {
+        return true;
+    }
+    
+    // Check if all blocks are free
+    while (current != NULL && 
+           (char*)current < (char*)page + page->size - page->free_mem) {
+        if (!current->is_free) {
+            return false;
+        }
+        current = current->next;
+    }
+    return true;
+}
+
+// Helper function to remove an empty page from the page list
+void remove_empty_page(MyPageHeader* page_to_remove) {
+    if (first_page == page_to_remove) {
+        // Removing the first page
+        first_page = page_to_remove->next;
+    } else {
+        // Find the previous page
+        MyPageHeader* prev = first_page;
+        while (prev != NULL && prev->next != page_to_remove) {
+            prev = prev->next;
+        }
+        if (prev != NULL) {
+            prev->next = page_to_remove->next;
+        }
+    }
+    
+    // Unmap the page from memory
+    munmap(page_to_remove, page_to_remove->size);
+}
+
+void my_free(void* ptr) {
+    if (ptr == NULL) {
+        return;
+    }
+    
+    // Find the block header
+    MyBlockHeader* block = (MyBlockHeader*)((char*)ptr - sizeof(MyBlockHeader));
+    
+    // Validate that this is a valid allocated block
+    if (block->is_free) {
+        printf("Warning: Attempting to free already freed memory at %p\n", ptr);
+        return;
+    }
+    
+    // Find which page this block belongs to
+    MyPageHeader* current_page = first_page;
+    MyPageHeader* block_page = NULL;
+    
+    while (current_page != NULL) {
+        char* page_start = (char*)current_page;
+        char* page_end = page_start + current_page->size;
+        
+        if ((char*)block >= page_start && (char*)block < page_end) {
+            block_page = current_page;
+            break;
+        }
+        current_page = current_page->next;
+    }
+    
+    if (block_page == NULL) {
+        printf("Error: Could not find page for block at %p\n", ptr);
+        return;
+    }
+    
+    printf("Freeing %zu bytes at %p (block header at %p)\n", block->size, ptr, (void*)block);
+    
+    // Mark block as free (DON'T update free_mem counter here - it's misleading)
+    // The free_mem represents unallocated space, not freed blocks
+    block->is_free = true;
+    
+    // Coalesce adjacent free blocks to reduce fragmentation
+    coalesce_blocks(block_page);
+    
+    // Check if the entire page is now free and can be returned to system
+    if (is_page_empty(block_page) && first_page != NULL && first_page->next != NULL) {
+        // Only remove page if it's not the last page (keep at least one page)
+        printf("Page is completely free, returning %zu bytes to system\n", block_page->size);
+        remove_empty_page(block_page);
+    }
 }
 
 // Function to print detailed memory usage statistics
