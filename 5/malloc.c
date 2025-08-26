@@ -28,83 +28,70 @@ static int debug_counter = 0;
 
 MyBlockHeader* find_free_block(size_t size){
     MyPageHeader* current_page = first_page;
-    //if there is a page, cycle through it then check for first block whether it is free and has enough size
+    // Iterate through each page
     while(current_page != NULL){
-        //find the first block in the page
-        MyBlockHeader* current_block = (MyBlockHeader*)((char*)current_page + sizeof(MyPageHeader));
-        
-        //cycle to available block in the page, and make sure we don't go out of page bounds,
-        //if block is out of page bounds, stop the loop and go to next page
-        while(current_block != NULL && (char*)current_block < (char*)current_page + current_page->size){
-            if(current_block->is_free && current_block->size >= size){
-                return current_block;
-            }
+        // Only search for blocks if the page actually has any allocated blocks.
+        // We know blocks exist if the free memory is less than the total available block space.
+        if (current_page->free_mem < current_page->size - sizeof(MyPageHeader)) {
+            MyBlockHeader* current_block = (MyBlockHeader*)((char*)current_page + sizeof(MyPageHeader));
+            
+            // Traverse the linked list of blocks on this page
+            while(current_block != NULL){
+                // A safety check to prevent running off the page in case of a corrupted list
+                if ((char*)current_block >= (char*)current_page + current_page->size) {
+                    break; 
+                }
+
+                if(current_block->is_free && current_block->size >= size){
+                    return current_block;
+                }
                 current_block = current_block->next;
             }
+        }
         current_page = current_page->next;
     }
-    return NULL;
+    return NULL; // No suitable block found
 }
 
+
 MyBlockHeader* create_new_block(size_t size, MyPageHeader* page){
-   //check if the page have enough free memory for our block
+   // Check if the page has enough free memory for our block
    if(page->free_mem < size + sizeof(MyBlockHeader)){
         return NULL;
    }
 
-//    MyBlockHeader* current_block= NULL;
-//    //cycle trough blocks in the page to find the last block
-//    if(page->free_mem == page->size + sizeof(MyPageHeader)){
-//         MyBlockHeader* current_block = (MyBlockHeader*)((char*)page + sizeof(MyPageHeader));
-//    }
-
-    MyBlockHeader* current_block = (MyBlockHeader*)((char*)page + sizeof(MyPageHeader));
-
-    // printf("---->testing log: %d\n", current_block);
-    MyBlockHeader* last_block = NULL;
-    
-//    printf("debug counter:%d", debug_counter);
-
-    while (current_block != NULL){
-        // printf("----->testing log: %d\n", current_block);
-        // debug_counter++;
-        // printf("debug counter:%d", debug_counter);
-    
-        //check boundary
-        if(current_block>(char*)page + page->size){
-            break;
-        }
-        last_block = current_block;
-        current_block = current_block->next;
-    }
-
-    //set new block address, if there is block travesed
-    char* new_block_pos;
-    if(last_block!=NULL){
-        new_block_pos = (char*)last_block + sizeof(MyBlockHeader) + last_block->size;
-    }
-    else{
-        new_block_pos = (char*)current_block;
-    }
-
-    //make new block
+    // The new block will be placed at the beginning of the free space.
+    // This is calculated by taking the page's start address and adding the amount of memory already in use.
+    char* new_block_pos = (char*)page + (page->size - page->free_mem);
     MyBlockHeader* new_block = (MyBlockHeader*) new_block_pos;
+    
+    MyBlockHeader* last_block = NULL;
+
+    // Check if this is NOT the first block in the page.
+    // If it is the first block, last_block remains NULL.
+    if (page->free_mem < page->size - sizeof(MyPageHeader)) {
+        // If we are here, blocks already exist. Find the last one by traversing the list.
+        last_block = (MyBlockHeader*)((char*)page + sizeof(MyPageHeader));
+        while (last_block->next != NULL) {
+            last_block = last_block->next;
+        }
+    }
+
+    // Set up the new block's properties
     new_block->is_free = false;
     new_block->size = size;
     new_block->next = NULL;
-    new_block->prev = NULL;
+    new_block->prev = last_block;
 
-    //link to existing block
+    // Link the previous block (if it exists) to the new one
     if (last_block != NULL) {
         last_block->next = new_block;
-        new_block->prev = last_block;
     }
     
-    // Update page free memory
+    // Update the page's free memory counter
     page->free_mem -= (size + sizeof(MyBlockHeader));
 
     return new_block;
-
 }
 
 MyPageHeader* create_new_page(size_t size){
