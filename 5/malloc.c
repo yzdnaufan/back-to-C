@@ -21,6 +21,18 @@ typedef struct MyBlockHeader{
     struct MyBlockHeader* prev;
 }MyBlockHeader;
 
+// {
+//     int x = 6;
+// }
+
+// // assembly
+// // stack:
+// // x
+// // ~x
+
+// // 
+// malloc()
+
 
 static MyPageHeader* first_page = NULL;
 
@@ -173,7 +185,7 @@ void* my_malloc(size_t size){
         return NULL;
     }
 
-    return (void*)((char*)block_mem+sizeof(MyBlockHeader));
+    return (void*)((char *)block_mem+sizeof(MyBlockHeader));
 }
 
 // Function to print detailed memory usage statistics
